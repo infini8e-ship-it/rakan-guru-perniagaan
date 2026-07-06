@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rakan Guru Perniagaan</title>
+<meta name="description" content="Pembantu AI guru Perniagaan KSSM — chatbot, jana soalan, RPH & analisis">
+<meta name="theme-color" content="#17332C">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="ikon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ═══ PINTU MASUK ═══ -->
+<div id="gate" class="gate tersembunyi">
+  <div class="gate-kad">
+    <div class="jenama"><span class="jenama-ikon">✓</span></div>
+    <h1>Rakan Guru<br>Perniagaan</h1>
+    <p class="gate-sub">KSSM Tingkatan 4 & 5 · Chatbot · Jana Soalan · RPH · Analisis</p>
+    <label for="kodAkses">Kod akses</label>
+    <input id="kodAkses" type="text" placeholder="Contoh: ABC2026" autocomplete="off" autocapitalize="characters">
+    <button id="btnMasuk" class="btn-utama">Masuk</button>
+    <p id="gateRalat" class="ralat"></p>
+    <p class="gate-nota">Dapatkan kod akses daripada penyelaras panitia anda.</p>
+  </div>
+</div>
+
+<!-- ═══ APP ═══ -->
+<div id="app" class="tersembunyi">
+<header class="kepala">
+  <span class="kepala-jenama"><span class="jenama-ikon kecil">✓</span> Rakan Guru Perniagaan</span>
+  <span id="statusTalian" class="talian" title="Status talian">●</span>
+</header>
+
+<main id="kandungan">
+
+  <!-- CHAT -->
+  <section id="view-chat" class="view">
+    <div id="chatSenarai" class="chat-senarai">
+      <div class="chat-kosong">
+        <p class="chat-kosong-tajuk">Pakar Kandungan Perniagaan</p>
+        <p>Tanya apa sahaja tentang kurikulum, konsep, contoh, atau perbandingan. Jawapan dirujuk terus daripada DSKP, buku teks dan modul.</p>
+        <div class="cadangan">
+          <button class="cip cadang" data-q="Terangkan perbezaan milikan tunggal, perkongsian dan syarikat berhad beserta contoh.">Bentuk pemilikan</button>
+          <button class="cip cadang" data-q="Apakah nisbah asas dalam penyata kewangan dan formula setiap satu?">Nisbah asas</button>
+          <button class="cip cadang" data-q="Huraikan 4P pemasaran dengan contoh perniagaan tempatan.">4P Pemasaran</button>
+        </div>
+      </div>
+    </div>
+    <div class="chat-input">
+      <textarea id="chatTeks" rows="1" placeholder="Taip soalan anda…"></textarea>
+      <button id="btnHantar" class="btn-hantar" title="Hantar">➤</button>
+    </div>
+  </section>
+
+  <!-- SOALAN -->
+  <section id="view-soalan" class="view tersembunyi">
+    <h2 class="tajuk-view">Jana Soalan</h2>
+    <div class="borang">
+      <div class="baris2">
+        <div><label>Tingkatan</label>
+          <select id="sTing"><option value="4">Tingkatan 4</option><option value="5">Tingkatan 5</option></select></div>
+        <div><label>Jenis</label>
+          <select id="sJenis"><option>Objektif (aneka pilihan)</option><option>Struktur (Bahagian A)</option><option>Esei (Bahagian B/C)</option></select></div>
+      </div>
+      <label>Standard Pembelajaran</label>
+      <select id="sSP"></select>
+      <div class="baris2">
+        <div><label>Aras KBAT</label>
+          <select id="sAras"><option>Mengingat/Memahami</option><option>Mengaplikasi</option><option>Menganalisis</option><option>Menilai</option><option>Mencipta</option><option value="campuran">Campuran aras</option></select></div>
+        <div><label>Bilangan</label>
+          <select id="sBil"><option>1</option><option>3</option><option selected>5</option><option>10</option></select></div>
+      </div>
+      <label class="semak"><input type="checkbox" id="sSkema" checked> Sertakan skema jawapan</label>
+      <button id="btnJanaSoalan" class="btn-utama">Jana soalan</button>
+    </div>
+    <div id="soalanHasil" class="hasil"></div>
+  </section>
+
+  <!-- RPH -->
+  <section id="view-rph" class="view tersembunyi">
+    <h2 class="tajuk-view">Rancang PdP (RPH)</h2>
+    <div class="borang">
+      <div class="baris2">
+        <div><label>Tingkatan</label>
+          <select id="rTing"><option value="4">Tingkatan 4</option><option value="5">Tingkatan 5</option></select></div>
+        <div><label>Masa</label>
+          <select id="rMasa"><option>60 minit</option><option selected>80 minit (2 waktu)</option><option>120 minit</option></select></div>
+      </div>
+      <label>Standard Pembelajaran</label>
+      <select id="rSP"></select>
+      <div class="baris2">
+        <div><label>Strategi PdP</label>
+          <select id="rStrategi"><option>Pembelajaran Kolaboratif</option><option>Pembelajaran Berasaskan Inkuiri</option><option>Pembelajaran Berasaskan Projek</option><option>Penyelesaian Masalah</option><option>Pembelajaran Masteri</option><option>Konstruktivisme</option><option>Pendekatan STEM</option></select></div>
+        <div><label>EMK</label>
+          <select id="rEMK"><option>Keusahawanan</option><option>Pendidikan Kewangan</option><option>Nilai Murni</option><option>TMK</option><option>Kreativiti dan Inovasi</option><option>Kelestarian Global</option><option>Bahasa</option></select></div>
+      </div>
+      <label>Nota tambahan (pilihan)</label>
+      <input id="rNota" type="text" placeholder="cth: kelas lemah, fokus latihan berkumpulan">
+      <button id="btnJanaRPH" class="btn-utama">Jana RPH</button>
+    </div>
+    <div id="rphHasil" class="hasil"></div>
+  </section>
+
+  <!-- ANALISIS -->
+  <section id="view-analisis" class="view tersembunyi">
+    <h2 class="tajuk-view">Analisis Markah</h2>
+    <p class="nota-view">Tampal markah murid — satu baris satu murid, format <code>Nama, Markah</code> atau markah sahaja. Berfungsi <strong>tanpa internet</strong>.</p>
+    <textarea id="aData" rows="6" placeholder="Ali, 76&#10;Siti, 58&#10;Farid, 82&#10;…"></textarea>
+    <button id="btnAnalisis" class="btn-utama">Analisis</button>
+    <div id="analisisHasil" class="hasil"></div>
+    <div class="carta-bekas tersembunyi" id="cartaBekas1"><canvas id="cartaGred"></canvas></div>
+    <div class="carta-bekas tersembunyi" id="cartaBekas2"><canvas id="cartaHisto"></canvas></div>
+    <button id="btnUlasAI" class="btn-kedua tersembunyi">💡 Dapatkan ulasan & cadangan AI</button>
+    <div id="ulasanHasil" class="hasil"></div>
+  </section>
+
+  <!-- LAGI: KB / TETAPAN / ADMIN -->
+  <section id="view-lagi" class="view tersembunyi">
+    <h2 class="tajuk-view">Lagi</h2>
+    <div class="menu-lagi">
+      <button class="menu-item" data-buka="kb"><span>📚</span> Rujukan Knowledgebase <small>DSKP · Nota · Soalan · JSU (offline)</small></button>
+      <button class="menu-item" data-buka="tetapan"><span>🔑</span> Tetapan API <small>Masukkan kunci Gemini percuma anda</small></button>
+      <button class="menu-item" data-buka="admin"><span>🛠️</span> Panel Admin <small>Untuk penyelaras sahaja</small></button>
+    </div>
+
+    <div id="panel-kb" class="panel tersembunyi">
+      <h3>Rujukan Knowledgebase</h3>
+      <input id="kbCari" type="search" placeholder="Cari: cth. nisbah semasa, insurans, 4P…">
+      <div class="cip-baris" id="kbTapis">
+        <button class="cip aktif" data-k="">Semua</button>
+        <button class="cip" data-k="dskp">DSKP</button>
+        <button class="cip" data-k="nota">Nota</button>
+        <button class="cip" data-k="soalan">Soalan</button>
+        <button class="cip" data-k="skema">Skema</button>
+        <button class="cip" data-k="jsu">JSU</button>
+      </div>
+      <div id="kbHasil" class="kb-hasil"></div>
+    </div>
+
+    <div id="panel-tetapan" class="panel tersembunyi">
+      <h3>Tetapan API Gemini (percuma)</h3>
+      <ol class="panduan">
+        <li>Layari <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> dan log masuk akaun Google.</li>
+        <li>Tekan <strong>Create API key</strong> → salin kunci bermula <code>AIza…</code></li>
+        <li>Tampal di bawah dan tekan Simpan. Kunci disimpan <strong>dalam peranti anda sahaja</strong> — tidak dihantar ke mana-mana pelayan kami.</li>
+      </ol>
+      <label>Kunci API Gemini</label>
+      <input id="tKunci" type="password" placeholder="AIza…" autocomplete="off">
+      <label>Model</label>
+      <select id="tModel">
+        <option value="gemini-2.5-flash" selected>Gemini 2.5 Flash (disyorkan)</option>
+        <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite (lebih laju)</option>
+        <option value="gemini-2.5-pro">Gemini 2.5 Pro (had kecil)</option>
+      </select>
+      <button id="btnSimpanKunci" class="btn-utama">Simpan & uji</button>
+      <p id="tStatus" class="nota-view"></p>
+    </div>
+
+    <div id="panel-admin" class="panel tersembunyi">
+      <h3>Panel Admin</h3>
+      <div id="adminLogin">
+        <label>Kata laluan admin</label>
+        <input id="adminPw" type="password" autocomplete="off">
+        <button id="btnAdminMasuk" class="btn-utama">Log masuk</button>
+        <p id="adminRalat" class="ralat"></p>
+      </div>
+      <div id="adminPanel" class="tersembunyi">
+        <h4>Dokumen tambahan knowledgebase</h4>
+        <p class="nota-view">Dokumen di sini <em>ditambah</em> kepada knowledgebase asas dan digunakan oleh AI serta carian rujukan semua guru.</p>
+        <div id="adminSenarai"></div>
+        <button id="btnDokBaru" class="btn-kedua">+ Tambah dokumen</button>
+        <div id="dokBorang" class="tersembunyi">
+          <label>Tajuk</label><input id="dTajuk" type="text">
+          <div class="baris2">
+            <div><label>Kategori</label>
+              <select id="dKategori"><option value="nota">Nota</option><option value="dskp">DSKP</option><option value="soalan">Soalan</option><option value="skema">Skema</option><option value="jsu">JSU</option><option value="lain">Lain</option></select></div>
+            <div><label>Tingkatan</label>
+              <select id="dTing"><option value="4">T4</option><option value="5">T5</option><option value="45" selected>T4 & T5</option></select></div>
+          </div>
+          <label>Kandungan</label><textarea id="dKandungan" rows="8"></textarea>
+          <input type="hidden" id="dId">
+          <div class="baris2">
+            <button id="btnDokSimpan" class="btn-utama">Simpan</button>
+            <button id="btnDokBatal" class="btn-kedua">Batal</button>
+          </div>
+        </div>
+        <h4>Keselamatan</h4>
+        <label>Tukar kod akses guru</label>
+        <div class="baris-inline"><input id="kodBaru" type="text" placeholder="Kod baharu"><button id="btnKodTukar" class="btn-kedua">Tukar</button></div>
+        <label>Tukar kata laluan admin</label>
+        <div class="baris-inline"><input id="pwBaru" type="password" placeholder="Kata laluan baharu"><button id="btnPwTukar" class="btn-kedua">Tukar</button></div>
+        <p id="adminStatus" class="nota-view"></p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<nav class="nav-bawah">
+  <button class="nav-item aktif" data-view="chat"><span>💬</span>Chat</button>
+  <button class="nav-item" data-view="soalan"><span>📝</span>Soalan</button>
+  <button class="nav-item" data-view="rph"><span>📅</span>RPH</button>
+  <button class="nav-item" data-view="analisis"><span>📊</span>Analisis</button>
+  <button class="nav-item" data-view="lagi"><span>⋯</span>Lagi</button>
+</nav>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
