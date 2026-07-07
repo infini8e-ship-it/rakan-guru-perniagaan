@@ -114,3 +114,14 @@ label{display:block;font-size:12.5px;font-weight:600;letter-spacing:.02em;margin
 code{font-family:var(--mono);font-size:.92em;background:#EFEAE0;padding:1px 5px;border-radius:4px}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 @media(min-width:640px){.gate-kad h1{font-size:34px}}
+
+/* v2: mod API & pratonton */
+.pilih-mod{display:flex;flex-direction:column;gap:9px;margin-top:4px}
+.mod-kad{display:flex;gap:11px;align-items:flex-start;border:1.5px solid var(--garis);border-radius:10px;padding:12px 13px;cursor:pointer;text-transform:none;font-size:14px;font-weight:400;color:var(--dakwat);margin:0}
+.mod-kad:has(input:checked){border-color:var(--hijau);background:#F2F8F5;outline:1.5px solid var(--hijau)}
+.mod-kad input{width:auto;margin-top:3px}
+.mod-kad small{color:var(--lembut)}
+.jadual-pra{border-collapse:collapse;width:100%;margin-top:8px;font-size:13.5px}
+.jadual-pra td,.jadual-pra th{border:1px solid var(--garis);padding:6px 9px;text-align:left}
+.jadual-pra th{background:var(--kertas);font-size:12px;text-transform:uppercase;letter-spacing:.03em}
+input[type=file]{padding:10px;background:var(--putih);border:1.5px dashed var(--garis);border-radius:9px}
