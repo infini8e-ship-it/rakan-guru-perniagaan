@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard PPD — Sistem Pemantauan Belanjawan Madani Kedah</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; }
+    #laporan-render { display: none; }
+    @media print {
+      body > *:not(#laporan-render) { display: none !important; }
+      #laporan-render { display: block !important; }
+      body { background: #ffffff; }
+      @page { size: A4; margin: 12mm; }
+    }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <!-- Nav -->
+  <nav class="bg-green-900 text-white shadow-lg sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center flex-wrap gap-2">
+      <div>
+        <p class="text-xs text-green-300">Sistem Pemantauan Belanjawan Madani Kedah</p>
+        <h1 id="nav-nama" class="font-bold text-base">Dashboard PPD</h1>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <span id="nav-daerah" class="text-xs bg-green-700 px-3 py-1 rounded-full text-green-200"></span>
+        <button onclick="muatTurunPDF()" id="btn-pdf" class="text-sm bg-yellow-500/90 hover:bg-yellow-500 text-green-950 font-semibold px-3 py-1.5 rounded-lg transition">Muat Turun PDF</button>
+        <button onclick="cetakLaporan()" class="text-sm bg-white/15 hover:bg-white/25 px-3 py-1.5 rounded-lg transition">Cetak</button>
+        <button onclick="logKeluar()" class="text-sm bg-white/15 hover:bg-white/25 px-3 py-1.5 rounded-lg transition">Log Keluar</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-2 sm:grid-cols-5 gap-4">
+      <div class="bg-white rounded-xl border shadow-sm p-4 text-center">
+        <p class="text-xs text-gray-500 mb-1">Jumlah Sekolah</p>
+        <p id="stat-sekolah" class="text-3xl font-bold text-gray-800">—</p>
+      </div>
+      <div class="bg-white rounded-xl border shadow-sm p-4 text-center">
+        <p class="text-xs text-gray-500 mb-1">Jumlah Guru</p>
+        <p id="stat-guru" class="text-3xl font-bold text-blue-700">—</p>
+      </div>
+      <div class="bg-white rounded-xl border shadow-sm p-4 text-center">
+        <p class="text-xs text-gray-500 mb-1">Jumlah Peruntukan</p>
+        <p id="stat-peruntukan" class="text-xl font-bold text-green-700">—</p>
+      </div>
+      <div class="bg-white rounded-xl border shadow-sm p-4 text-center">
+        <p class="text-xs text-gray-500 mb-1">Jumlah Digunakan</p>
+        <p id="stat-guna" class="text-xl font-bold text-orange-600">—</p>
+      </div>
+      <div class="bg-white rounded-xl border shadow-sm p-4 text-center">
+        <p class="text-xs text-gray-500 mb-1">% Penggunaan</p>
+        <p id="stat-pct" class="text-3xl font-bold text-indigo-700">—</p>
+      </div>
+    </div>
+
+    <!-- Penanda Amaran -->
+    <div class="bg-white rounded-xl border shadow-sm p-5">
+      <h3 class="font-semibold text-gray-700 mb-3">⚠️ Penanda Amaran Automatik</h3>
+      <div id="kawasan-amaran" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <p class="text-gray-400 text-sm">Memuatkan...</p>
+      </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="bg-white rounded-xl border shadow-sm p-5">
+        <h3 class="font-semibold text-gray-700 mb-4">Perbelanjaan Mengikut Sekolah (RM)</h3>
+        <div style="height:260px; position:relative;">
+          <canvas id="chart-sekolah"></canvas>
+        </div>
+      </div>
+      <div class="bg-white rounded-xl border shadow-sm p-5">
+        <h3 class="font-semibold text-gray-700 mb-4">Status Latihan</h3>
+        <div style="height:260px; position:relative;">
+          <canvas id="chart-status"></canvas>
+        </div>
+      </div>
+      <div class="bg-white rounded-xl border shadow-sm p-5">
+        <h3 class="font-semibold text-gray-700 mb-4">Kemajuan Subjek Wajib Daerah</h3>
+        <div class="grid grid-cols-2 gap-4 items-center h-[260px]">
+          <div style="height:200px; position:relative;">
+            <canvas id="chart-subjek"></canvas>
+          </div>
+          <div id="legend-subjek" class="space-y-2 text-sm"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Senarai Sekolah -->
+    <div class="bg-white rounded-xl border shadow-sm">
+      <div class="p-5 border-b flex justify-between items-center flex-wrap gap-3">
+        <h3 class="font-semibold text-gray-700">Senarai Sekolah dalam Daerah</h3>
+        <input type="text" id="cari-sekolah" placeholder="Cari nama / kod sekolah..." onkeyup="filterSekolah()"
+          class="border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent w-64">
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="bg-gray-50 border-b text-gray-600 text-left">
+              <th class="px-4 py-3">Sekolah</th>
+              <th class="px-4 py-3 text-center">Guru</th>
+              <th class="px-4 py-3 text-right">Peruntukan</th>
+              <th class="px-4 py-3 text-right">Digunakan</th>
+              <th class="px-4 py-3 text-right">Baki</th>
+              <th class="px-4 py-3 text-center">BM</th>
+              <th class="px-4 py-3 text-center">BI</th>
+              <th class="px-4 py-3 text-center">Mat</th>
+              <th class="px-4 py-3 text-center">Sej</th>
+              <th class="px-4 py-3 text-center">Sains</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-sekolah">
+            <tr><td colspan="10" class="text-center py-10 text-gray-400">⏳ Memuatkan data...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Senarai Latihan -->
+    <div class="bg-white rounded-xl border shadow-sm">
+      <div class="p-5 border-b space-y-3">
+        <h3 class="font-semibold text-gray-700">Senarai Semua Latihan</h3>
+        <div class="flex flex-wrap gap-3 items-end">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Status</label>
+            <select id="tapis-status" onchange="renderJadualLatihan()" class="border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-green-500">
+              <option value="">Semua Status</option>
+              <option value="Dalam Pelaksanaan">Dalam Pelaksanaan</option>
+              <option value="Selesai">Selesai</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Subjek</label>
+            <select id="tapis-subjek" onchange="renderJadualLatihan()" class="border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-green-500">
+              <option value="">Semua Subjek</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Tarikh Dari</label>
+            <input type="date" id="tapis-dari" onchange="renderJadualLatihan()" class="border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-green-500">
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Tarikh Hingga</label>
+            <input type="date" id="tapis-hingga" onchange="renderJadualLatihan()" class="border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-green-500">
+          </div>
+          <div class="flex-1 min-w-[180px]">
+            <label class="block text-xs text-gray-500 mb-1">Carian Sekolah</label>
+            <input type="text" id="tapis-cari" placeholder="Nama / kod sekolah..." onkeyup="renderJadualLatihan()"
+              class="w-full border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-green-500">
+          </div>
+          <button onclick="resetTapis()" class="text-xs text-gray-500 border rounded-lg px-3 py-2 hover:bg-gray-50">Set Semula</button>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="bg-gray-50 border-b text-gray-600 text-left">
+              <th class="px-4 py-3">Sekolah</th>
+              <th class="px-4 py-3">Tajuk Latihan</th>
+              <th class="px-4 py-3">Subjek</th>
+              <th class="px-4 py-3">Tempoh</th>
+              <th class="px-4 py-3 text-right">Kos (RM)</th>
+              <th class="px-4 py-3 text-center">Status</th>
+              <th class="px-4 py-3 text-center">Laporan</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-latihan">
+            <tr><td colspan="7" class="text-center py-8 text-gray-400">⏳ Memuatkan data...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Kawasan render laporan -->
+  <div id="laporan-render"></div>
+
+  <script>
+    const SUPABASE_URL = 'https://oyjrnfndbgcofqldamvg.supabase.co'
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95anJuZm5kYmdjb2ZxbGRhbXZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5OTYwNTYsImV4cCI6MjA5ODU3MjA1Nn0.USvlz-vOM07C0_5YprVQLUHqjQR_ShaJ6fjua-rDU7I'
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+    const SUBJEK_WAJIB = ['Bahasa Melayu', 'Bahasa Inggeris', 'Matematik', 'Sejarah', 'Sains']
+
+    let pengguna = null, senaraiSekolah = [], senaraiLatihan = []
+    let chartSekolah = null, chartStatus = null, chartSubjek = null
+    let sekolahTerpapar = []
+
+    async function init() {
+      const raw = localStorage.getItem('sesi_pengguna')
+      if (!raw) return window.location.href = 'index.html'
+      pengguna = JSON.parse(raw)
+      if (pengguna.peranan !== 'PPD') return window.location.href = 'index.html'
+
+      document.getElementById('nav-nama').textContent = pengguna.nama
+      document.getElementById('nav-daerah').textContent = pengguna.daerah
+      document.title = 'Dashboard PPD ' + pengguna.daerah
+
+      await muatData()
+    }
+
+    async function muatData() {
+      const [{ data: skl }, { data: lat }] = await Promise.all([
+        sb.from('sekolah').select('*').eq('daerah', pengguna.daerah).order('nama_sekolah'),
+        sb.from('latihan').select('*, sekolah!inner(daerah)').eq('sekolah.daerah', pengguna.daerah)
+      ])
+      senaraiSekolah = skl || []
+      senaraiLatihan = lat || []
+      sekolahTerpapar = [...senaraiSekolah]
+      isiPilihanSubjek()
+      renderSemua()
+    }
+
+    function isiPilihanSubjek() {
+      const semua = new Set(SUBJEK_WAJIB)
+      senaraiLatihan.forEach(l => (l.subjek || []).forEach(s => semua.add(s)))
+      const sel = document.getElementById('tapis-subjek')
+      sel.innerHTML = '<option value="">Semua Subjek</option>' + [...semua].map(s => `<option value="${escapeAttr(s)}">${escapeHtml(s)}</option>`).join('')
+    }
+
+    function gunaSekolah(skolId) {
+      return senaraiLatihan.filter(l => l.sekolah_id === skolId).reduce((s, l) => s + parseFloat(l.anggaran_kos || 0), 0)
+    }
+
+    function statusSubjekSekolah(skolId, subj) {
+      const rekod = senaraiLatihan.filter(l => l.sekolah_id === skolId && l.subjek?.includes(subj))
+      if (!rekod.length) return 'X'
+      if (rekod.some(l => l.status === 'Selesai')) return '✅'
+      return '⏳'
+    }
+
+    function bilWajibSelesai(skolId) {
+      return SUBJEK_WAJIB.filter(s => statusSubjekSekolah(skolId, s) === '✅').length
+    }
+
+    function renderSemua() {
+      renderKad()
+      renderAmaran()
+      renderJadualSekolah()
+      renderJadualLatihan()
+      renderCharts()
+    }
+
+    function renderKad() {
+      const guru = senaraiSekolah.reduce((s, sk) => s + sk.bil_guru, 0)
+      const peruntukan = senaraiSekolah.reduce((s, sk) => s + parseFloat(sk.bajet || 0), 0)
+      const guna = senaraiSekolah.reduce((s, sk) => s + gunaSekolah(sk.id), 0)
+      const pct = peruntukan > 0 ? (guna / peruntukan * 100) : 0
+      document.getElementById('stat-sekolah').textContent = senaraiSekolah.length
+      document.getElementById('stat-guru').textContent = guru.toLocaleString()
+      document.getElementById('stat-peruntukan').textContent = 'RM ' + fmt(peruntukan)
+      document.getElementById('stat-guna').textContent = 'RM ' + fmt(guna)
+      document.getElementById('stat-pct').textContent = pct.toFixed(1) + '%'
+    }
+
+    // ---------- Penanda amaran automatik ----------
+    function kiraAmaran() {
+      const tiadaLatihan = senaraiSekolah.filter(sk => !senaraiLatihan.some(l => l.sekolah_id === sk.id))
+      const belumLengkap = senaraiSekolah.filter(sk => bilWajibSelesai(sk.id) < 5)
+      const tiadaPautan = senaraiLatihan.filter(l => l.status === 'Selesai' && !l.pautan_laporan)
+      const lebihBajet = senaraiSekolah.filter(sk => gunaSekolah(sk.id) > parseFloat(sk.bajet || 0))
+      return { tiadaLatihan, belumLengkap, tiadaPautan, lebihBajet }
+    }
+
+    function renderAmaran() {
+      const a = kiraAmaran()
+      const kad = (tajuk, senarai, warna, papar) => `
+        <div class="border rounded-xl p-4 ${senarai.length ? warna : 'border-gray-200 bg-gray-50'}">
+          <div class="flex justify-between items-center">
+            <p class="text-xs font-medium ${senarai.length ? '' : 'text-gray-400'}">${tajuk}</p>
+            <span class="text-lg font-bold">${senarai.length}</span>
+          </div>
+          ${senarai.length ? `<details class="mt-2"><summary class="text-xs cursor-pointer underline">Lihat senarai</summary>
+            <ul class="mt-1 text-xs space-y-0.5 max-h-32 overflow-y-auto">${senarai.slice(0, 50).map(papar).join('')}</ul></details>` : '<p class="text-xs text-gray-400 mt-1">Tiada</p>'}
+        </div>`
+      document.getElementById('kawasan-amaran').innerHTML =
+        kad('Sekolah tanpa sebarang latihan', a.tiadaLatihan, 'border-red-300 bg-red-50 text-red-700', sk => `<li>• ${escapeHtml(sk.nama_sekolah)}</li>`) +
+        kad('Sekolah belum lengkap 5 subjek wajib', a.belumLengkap, 'border-amber-300 bg-amber-50 text-amber-700', sk => `<li>• ${escapeHtml(sk.nama_sekolah)} (${bilWajibSelesai(sk.id)}/5)</li>`) +
+        kad('Latihan Selesai tanpa pautan laporan', a.tiadaPautan, 'border-orange-300 bg-orange-50 text-orange-700', l => `<li>• ${escapeHtml(l.nama_latihan)} — ${escapeHtml(namaSekolah(l.sekolah_id))}</li>`) +
+        kad('Perbelanjaan melebihi peruntukan', a.lebihBajet, 'border-red-300 bg-red-50 text-red-700', sk => `<li>• ${escapeHtml(sk.nama_sekolah)} (RM ${fmt(gunaSekolah(sk.id) - sk.bajet)} lebihan)</li>`)
+    }
+
+    function namaSekolah(id) {
+      return senaraiSekolah.find(s => s.id === id)?.nama_sekolah || '—'
+    }
+
+    function renderJadualSekolah() {
+      const tbody = document.getElementById('tbody-sekolah')
+      if (!sekolahTerpapar.length) {
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-gray-400">Tiada sekolah.</td></tr>'
+        return
+      }
+      tbody.innerHTML = sekolahTerpapar.map(sk => {
+        const guna = gunaSekolah(sk.id)
+        const baki = sk.bajet - guna
+        const pct = sk.bajet > 0 ? (guna / sk.bajet * 100) : 0
+        const barColor = pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-yellow-500' : 'bg-green-500'
+        const chips = SUBJEK_WAJIB.map(s => {
+          const st = statusSubjekSekolah(sk.id, s)
+          const bg = st === '✅' ? 'bg-green-100 text-green-700' : st === '⏳' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-400'
+          return `<td class="px-2 py-3 text-center"><span class="text-xs px-1.5 py-0.5 rounded ${bg}">${st}</span></td>`
+        }).join('')
+        return `<tr class="border-t hover:bg-gray-50">
+          <td class="px-4 py-3">
+            <p class="font-medium text-gray-800">${escapeHtml(sk.nama_sekolah)} <span class="text-xs text-gray-400 font-normal">(${escapeHtml(sk.kod)})</span></p>
+            <div class="flex items-center gap-1 mt-1">
+              <div class="flex-1 bg-gray-200 rounded-full h-1.5">
+                <div class="h-1.5 rounded-full ${barColor}" style="width:${Math.min(pct,100)}%"></div>
+              </div>
+              <span class="text-xs text-gray-400">${pct.toFixed(0)}%</span>
+            </div>
+          </td>
+          <td class="px-4 py-3 text-center">${sk.bil_guru}</td>
+          <td class="px-4 py-3 text-right text-gray-600">RM ${fmt(sk.bajet)}</td>
+          <td class="px-4 py-3 text-right text-orange-600">RM ${fmt(guna)}</td>
+          <td class="px-4 py-3 text-right font-medium ${baki < 0 ? 'text-red-600' : 'text-green-600'}">RM ${fmt(baki)}</td>
+          ${chips}
+        </tr>`
+      }).join('')
+    }
+
+    function latihanTertapis() {
+      const st = document.getElementById('tapis-status').value
+      const sj = document.getElementById('tapis-subjek').value
+      const dari = document.getElementById('tapis-dari').value
+      const hingga = document.getElementById('tapis-hingga').value
+      const q = document.getElementById('tapis-cari').value.toLowerCase()
+
+      return senaraiLatihan.filter(l => {
+        if (st && l.status !== st) return false
+        if (sj && !(l.subjek || []).includes(sj)) return false
+        if (dari && (!l.tarikh_mula || l.tarikh_mula < dari)) return false
+        if (hingga && (!l.tarikh_mula || l.tarikh_mula > hingga)) return false
+        if (q) {
+          const sk = senaraiSekolah.find(s => s.id === l.sekolah_id)
+          const teks = ((sk?.nama_sekolah || '') + ' ' + (sk?.kod || '')).toLowerCase()
+          if (!teks.includes(q)) return false
+        }
+        return true
+      })
+    }
+
+    function resetTapis() {
+      document.getElementById('tapis-status').value = ''
+      document.getElementById('tapis-subjek').value = ''
+      document.getElementById('tapis-dari').value = ''
+      document.getElementById('tapis-hingga').value = ''
+      document.getElementById('tapis-cari').value = ''
+      renderJadualLatihan()
+    }
+
+    function renderJadualLatihan() {
+      const tbody = document.getElementById('tbody-latihan')
+      const sorted = latihanTertapis().sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      if (!sorted.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-400">Tiada rekod latihan menepati tapisan.</td></tr>'
+        return
+      }
+      tbody.innerHTML = sorted.map(l => {
+        const sk = senaraiSekolah.find(s => s.id === l.sekolah_id)
+        const stClass = l.status === 'Selesai' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+        const laporan = l.pautan_laporan
+          ? `<a href="${escapeAttr(l.pautan_laporan)}" target="_blank" rel="noopener noreferrer"
+               class="inline-block bg-blue-600 text-white text-xs px-3 py-1 rounded-lg hover:bg-blue-700 transition">Buka Laporan</a>`
+          : '<span class="text-gray-300 text-xs">—</span>'
+        return `<tr class="border-t hover:bg-gray-50">
+          <td class="px-4 py-3 text-gray-600 text-sm">${escapeHtml(sk?.nama_sekolah || '—')}</td>
+          <td class="px-4 py-3 font-medium">${escapeHtml(l.nama_latihan)}</td>
+          <td class="px-4 py-3 text-gray-600">${(l.subjek || []).map(escapeHtml).join(', ') || '—'}</td>
+          <td class="px-4 py-3 text-gray-600 whitespace-nowrap">${fmtTempoh(l)}</td>
+          <td class="px-4 py-3 text-right">RM ${fmt(l.anggaran_kos)}</td>
+          <td class="px-4 py-3 text-center"><span class="text-xs px-2 py-1 rounded-full ${stClass}">${l.status}</span></td>
+          <td class="px-4 py-3 text-center">${laporan}</td>
+        </tr>`
+      }).join('')
+    }
+
+    function renderCharts() {
+      // Bar: perbelanjaan per sekolah (top 10)
+      const top10 = senaraiSekolah
+        .map(sk => ({ nama: sk.nama_sekolah.replace('SEKOLAH ', '').replace('KEBANGSAAN ', 'SK ').substring(0, 20), guna: gunaSekolah(sk.id), peruntukan: sk.bajet }))
+        .sort((a, b) => b.guna - a.guna)
+        .slice(0, 10)
+
+      if (chartSekolah) chartSekolah.destroy()
+      chartSekolah = new Chart(document.getElementById('chart-sekolah'), {
+        type: 'bar',
+        data: {
+          labels: top10.map(s => s.nama),
+          datasets: [
+            { label: 'Digunakan (RM)', data: top10.map(s => s.guna), backgroundColor: 'rgba(22,163,74,0.7)', borderRadius: 4 },
+            { label: 'Peruntukan (RM)', data: top10.map(s => s.peruntukan), backgroundColor: 'rgba(209,213,219,0.5)', borderRadius: 4 }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: 'top', labels: { font: { size: 11 } } } },
+          scales: { x: { ticks: { font: { size: 9 }, maxRotation: 45 } }, y: { ticks: { font: { size: 10 } } } }
+        }
+      })
+
+      // Pai: status latihan
+      const bilSelesai = senaraiLatihan.filter(l => l.status === 'Selesai').length
+      const bilPelaksanaan = senaraiLatihan.length - bilSelesai
+      if (chartStatus) chartStatus.destroy()
+      chartStatus = new Chart(document.getElementById('chart-status'), {
+        type: 'pie',
+        data: {
+          labels: ['Selesai', 'Dalam Pelaksanaan'],
+          datasets: [{ data: [bilSelesai, bilPelaksanaan], backgroundColor: ['#22c55e', '#eab308'], borderWidth: 2 }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } } }
+      })
+
+      // Doughnut: kemajuan subjek wajib
+      const statusCount = { 'Selesai': 0, 'Dalam Pelaksanaan': 0, 'Belum Dirancang': 0 }
+      senaraiSekolah.forEach(sk => {
+        SUBJEK_WAJIB.forEach(subj => {
+          const rekod = senaraiLatihan.filter(l => l.sekolah_id === sk.id && l.subjek?.includes(subj))
+          if (!rekod.length) statusCount['Belum Dirancang']++
+          else if (rekod.some(l => l.status === 'Selesai')) statusCount['Selesai']++
+          else statusCount['Dalam Pelaksanaan']++
+        })
+      })
+
+      if (chartSubjek) chartSubjek.destroy()
+      chartSubjek = new Chart(document.getElementById('chart-subjek'), {
+        type: 'doughnut',
+        data: {
+          labels: Object.keys(statusCount),
+          datasets: [{ data: Object.values(statusCount), backgroundColor: ['#22c55e','#eab308','#d1d5db'], borderWidth: 2 }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+      })
+
+      document.getElementById('legend-subjek').innerHTML = Object.entries(statusCount).map(([k, v]) => `
+        <div class="flex items-center gap-2">
+          <div class="w-3 h-3 rounded-full ${k === 'Selesai' ? 'bg-green-500' : k === 'Dalam Pelaksanaan' ? 'bg-yellow-500' : 'bg-gray-300'}"></div>
+          <span class="text-gray-600">${k}</span>
+          <span class="font-bold text-gray-800 ml-auto">${v}</span>
+        </div>`).join('')
+    }
+
+    function filterSekolah() {
+      const q = document.getElementById('cari-sekolah').value.toLowerCase()
+      sekolahTerpapar = senaraiSekolah.filter(s =>
+        s.nama_sekolah.toLowerCase().includes(q) || (s.kod || '').toLowerCase().includes(q))
+      renderJadualSekolah()
+    }
+
+    // ---------- Laporan PDF & Cetak ----------
+    function binaLaporanHTML() {
+      const tarikhJana = new Date().toLocaleDateString('ms-MY', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      const guru = senaraiSekolah.reduce((s, sk) => s + sk.bil_guru, 0)
+      const peruntukan = senaraiSekolah.reduce((s, sk) => s + parseFloat(sk.bajet || 0), 0)
+      const guna = senaraiSekolah.reduce((s, sk) => s + gunaSekolah(sk.id), 0)
+      const baki = peruntukan - guna
+      const pct = peruntukan > 0 ? (guna / peruntukan * 100) : 0
+
+      const imgBar = chartSekolah ? chartSekolah.toBase64Image() : ''
+      const imgStatus = chartStatus ? chartStatus.toBase64Image() : ''
+      const imgSubjek = chartSubjek ? chartSubjek.toBase64Image() : ''
+
+      const barisPrestasi = senaraiSekolah.map((sk, i) => {
+        const g = gunaSekolah(sk.id)
+        const p = sk.bajet > 0 ? (g / sk.bajet * 100) : 0
+        const bilLatihan = senaraiLatihan.filter(l => l.sekolah_id === sk.id).length
+        const adaPautan = senaraiLatihan.some(l => l.sekolah_id === sk.id && l.pautan_laporan)
+        return `<tr>
+          <td style="border:1px solid #cbd5e1;padding:5px;text-align:center;">${i + 1}</td>
+          <td style="border:1px solid #cbd5e1;padding:5px;">${escapeHtml(sk.nama_sekolah)} (${escapeHtml(sk.kod)})</td>
+          <td style="border:1px solid #cbd5e1;padding:5px;text-align:center;">${bilLatihan}</td>
+          <td style="border:1px solid #cbd5e1;padding:5px;text-align:center;">${bilWajibSelesai(sk.id)}/5</td>
+          <td style="border:1px solid #cbd5e1;padding:5px;text-align:right;">${p.toFixed(1)}%</td>
+          <td style="border:1px solid #cbd5e1;padding:5px;text-align:center;">${adaPautan ? 'Ada' : 'Tiada'}</td>
+        </tr>`
+      }).join('')
+
+      const barisLatihan = senaraiLatihan.length
+        ? [...senaraiLatihan].sort((a, b) => (a.tarikh_mula || '').localeCompare(b.tarikh_mula || '')).map((l, i) => `
+          <tr>
+            <td style="border:1px solid #cbd5e1;padding:5px;text-align:center;">${i + 1}</td>
+            <td style="border:1px solid #cbd5e1;padding:5px;">${escapeHtml(namaSekolah(l.sekolah_id))}</td>
+            <td style="border:1px solid #cbd5e1;padding:5px;">${escapeHtml(l.nama_latihan)}</td>
+            <td style="border:1px solid #cbd5e1;padding:5px;">${(l.subjek || []).map(escapeHtml).join(', ')}</td>
+            <td style="border:1px solid #cbd5e1;padding:5px;white-space:nowrap;">${fmtTempoh(l)}</td>
+            <td style="border:1px solid #cbd5e1;padding:5px;text-align:right;">RM ${fmt(l.anggaran_kos)}</td>
+            <td style="border:1px solid #cbd5e1;padding:5px;text-align:center;">${l.status}</td>
+          </tr>`).join('')
+        : '<tr><td colspan="7" style="border:1px solid #cbd5e1;padding:10px;text-align:center;color:#94a3b8;">Tiada rekod latihan.</td></tr>'
+
+      return `
+      <div style="width:794px;background:#ffffff;color:#0f172a;font-family:system-ui,-apple-system,sans-serif;padding:32px;box-sizing:border-box;">
+        <div style="text-align:center;padding:36px 0 24px;border-bottom:4px solid #166534;margin-bottom:22px;">
+          <p style="font-size:12px;letter-spacing:2px;color:#166534;font-weight:600;margin:0;">JABATAN PENDIDIKAN NEGERI KEDAH</p>
+          <h1 style="font-size:22px;margin:10px 0 4px;">Sistem Pemantauan Belanjawan Madani Negeri Kedah</h1>
+          <h2 style="font-size:16px;color:#334155;margin:4px 0;">Laporan PPD — Daerah ${escapeHtml(pengguna.daerah)}</h2>
+          <p style="font-size:11px;color:#94a3b8;margin-top:8px;">Tarikh Jana: ${tarikhJana}</p>
+        </div>
+
+        <h3 style="font-size:14px;border-left:4px solid #166534;padding-left:8px;">Ringkasan Daerah</h3>
+        <table style="width:100%;border-collapse:collapse;font-size:11px;margin:8px 0 18px;">
+          <tr>
+            <td style="border:1px solid #cbd5e1;padding:8px;background:#f0fdf4;">Bilangan Sekolah</td><td style="border:1px solid #cbd5e1;padding:8px;text-align:right;font-weight:700;">${senaraiSekolah.length}</td>
+            <td style="border:1px solid #cbd5e1;padding:8px;background:#f0fdf4;">Bilangan Guru</td><td style="border:1px solid #cbd5e1;padding:8px;text-align:right;font-weight:700;">${guru.toLocaleString()}</td>
+          </tr>
+          <tr>
+            <td style="border:1px solid #cbd5e1;padding:8px;background:#f0fdf4;">Jumlah Peruntukan</td><td style="border:1px solid #cbd5e1;padding:8px;text-align:right;font-weight:700;">RM ${fmt(peruntukan)}</td>
+            <td style="border:1px solid #cbd5e1;padding:8px;background:#f0fdf4;">Jumlah Perbelanjaan</td><td style="border:1px solid #cbd5e1;padding:8px;text-align:right;font-weight:700;">RM ${fmt(guna)}</td>
+          </tr>
+          <tr>
+            <td style="border:1px solid #cbd5e1;padding:8px;background:#f0fdf4;">Baki</td><td style="border:1px solid #cbd5e1;padding:8px;text-align:right;font-weight:700;color:${baki < 0 ? '#dc2626' : '#16a34a'};">RM ${fmt(baki)}</td>
+            <td style="border:1px solid #cbd5e1;padding:8px;background:#f0fdf4;">% Penggunaan</td><td style="border:1px solid #cbd5e1;padding:8px;text-align:right;font-weight:700;">${pct.toFixed(1)}%</td>
+          </tr>
+        </table>
+
+        <h3 style="font-size:14px;border-left:4px solid #166534;padding-left:8px;">Graf</h3>
+        <div style="margin:8px 0 18px;">
+          ${imgBar ? `<p style="font-size:11px;font-weight:600;margin:6px 0 2px;">Perbelanjaan Mengikut Sekolah</p><img src="${imgBar}" style="width:100%;border:1px solid #e2e8f0;border-radius:6px;">` : ''}
+          <table style="width:100%;margin-top:8px;"><tr>
+            <td style="width:50%;vertical-align:top;padding-right:6px;">${imgStatus ? `<p style="font-size:11px;font-weight:600;margin:4px 0 2px;">Status Latihan</p><img src="${imgStatus}" style="width:100%;border:1px solid #e2e8f0;border-radius:6px;">` : ''}</td>
+            <td style="width:50%;vertical-align:top;padding-left:6px;">${imgSubjek ? `<p style="font-size:11px;font-weight:600;margin:4px 0 2px;">Kemajuan Subjek Wajib</p><img src="${imgSubjek}" style="width:100%;border:1px solid #e2e8f0;border-radius:6px;">` : ''}</td>
+          </tr></table>
+        </div>
+
+        <h3 style="font-size:14px;border-left:4px solid #166534;padding-left:8px;">Jadual Prestasi Sekolah</h3>
+        <table style="width:100%;border-collapse:collapse;font-size:10px;margin:8px 0 18px;">
+          <thead><tr style="background:#166534;color:#ffffff;">
+            <th style="border:1px solid #cbd5e1;padding:5px;">Bil</th>
+            <th style="border:1px solid #cbd5e1;padding:5px;">Sekolah</th>
+            <th style="border:1px solid #cbd5e1;padding:5px;">Bil. Latihan</th>
+            <th style="border:1px solid #cbd5e1;padding:5px;">Subjek Wajib Selesai</th>
+            <th style="border:1px solid #cbd5e1;padding:5px;">% Bajet Digunakan</th>
+            <th style="border:1px solid #cbd5e1;padding:5px;">Pautan Laporan</th>
+          </tr></thead>
+          <tbody>${barisPrestasi}</tbody>
+        </table>
+
+        <h3 style="font-size:14px;border-left:4px solid #166534;padding-left:8px;">Senarai Latihan Penuh Daerah</h3>
+        <table style="width:100%;border-collapse:collapse;font-size:10px;margin-top:8px;">
+          <thead><tr style="background:#166534;color:#ffffff;">
+            <th style="border:1px solid #cbd5e1;padding:5px;">Bil</th>
+            <th style="border:1px solid #cbd5e1;padding:5px;">Sekolah</th>
+            <th style="border:1px solid #cbd5e1;padding:5px;">Tajuk Latihan</th>
+            <th style="border:1px solid #cbd5e1;padding:5px;">Subjek</th>
+            <th style="border:1px solid #cbd5e1;padding:5px;">Tempoh</th>
+            <th style="border:1px solid #cbd5e1;padding:5px;">Kos</th>
+            <th style="border:1px solid #cbd5e1;padding:5px;">Status</th>
+          </tr></thead>
+          <tbody>${barisLatihan}</tbody>
+        </table>
+        <p style="font-size:9px;color:#94a3b8;margin-top:16px;text-align:center;">Dijana oleh Sistem Pemantauan Belanjawan Madani Negeri Kedah — ${tarikhJana}</p>
+      </div>`
+    }
+
+    async function muatTurunPDF() {
+      const btn = document.getElementById('btn-pdf')
+      btn.textContent = '⏳ Menjana...'
+      btn.disabled = true
+      try {
+        const wadah = document.getElementById('laporan-render')
+        wadah.innerHTML = binaLaporanHTML()
+        wadah.style.display = 'block'
+        wadah.style.position = 'absolute'
+        wadah.style.left = '-9999px'
+        wadah.style.top = '0'
+
+        const kanvas = await html2canvas(wadah.firstElementChild, { scale: 2, useCORS: true, backgroundColor: '#ffffff' })
+        const { jsPDF } = window.jspdf
+        const pdf = new jsPDF('p', 'mm', 'a4')
+        const lebarPdf = 210, tinggiPdf = 297
+        const tinggiImej = kanvas.height * lebarPdf / kanvas.width
+        let bakiTinggi = tinggiImej, posisi = 0
+        const imgData = kanvas.toDataURL('image/jpeg', 0.92)
+        pdf.addImage(imgData, 'JPEG', 0, posisi, lebarPdf, tinggiImej)
+        bakiTinggi -= tinggiPdf
+        while (bakiTinggi > 0) {
+          posisi -= tinggiPdf
+          pdf.addPage()
+          pdf.addImage(imgData, 'JPEG', 0, posisi, lebarPdf, tinggiImej)
+          bakiTinggi -= tinggiPdf
+        }
+        pdf.save('Laporan_PPD_' + pengguna.daerah.replace(/[^A-Za-z0-9]/g, '_') + '.pdf')
+        wadah.style.display = 'none'
+        wadah.innerHTML = ''
+      } catch (e) {
+        alert('Ralat menjana PDF: ' + e.message)
+      }
+      btn.textContent = 'Muat Turun PDF'
+      btn.disabled = false
+    }
+
+    function cetakLaporan() {
+      const wadah = document.getElementById('laporan-render')
+      wadah.innerHTML = binaLaporanHTML()
+      wadah.style.position = ''
+      wadah.style.left = ''
+      window.print()
+      setTimeout(() => { wadah.innerHTML = '' }, 500)
+    }
+
+    // ---------- Util ----------
+    function logKeluar() {
+      localStorage.removeItem('sesi_pengguna')
+      window.location.href = 'index.html'
+    }
+
+    function escapeAttr(v) {
+      return String(v || '')
+        .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    }
+    function escapeHtml(v) { return escapeAttr(v) }
+
+    function fmt(n) {
+      return parseFloat(n || 0).toLocaleString('ms-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    }
+
+    function fmtTarikh(t) {
+      // Format HH/BB/TTTT (contoh: 01/08/2026)
+      if (!t) return '—'
+      const [thn, bln, hri] = t.split('-')
+      return `${hri}/${bln}/${thn}`
+    }
+
+    function fmtTempoh(l) {
+      const mula = l.tarikh_mula, akhir = l.tarikh_akhir
+      if (!mula) return '—'
+      if (!akhir || akhir === mula) return fmtTarikh(mula)
+      return fmtTarikh(mula) + ' – ' + fmtTarikh(akhir)
+    }
+
+    init()
+  </script>
+</body>
+</html>
